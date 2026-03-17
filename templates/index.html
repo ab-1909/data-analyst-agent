@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Privacy-First Interactive Data Analyst Agent — Analyze your CSV data locally with AI-powered insights and visualizations." />
+    <title>Data Analyst Agent — Privacy-First AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+    <!-- ═══════════ Toast container ═══════════ -->
+    <div id="toast-container"></div>
+
+    <!-- ═══════════ Top bar ═══════════ -->
+    <header id="top-bar">
+        <div class="logo">
+            <span class="logo-icon">🛡️</span>
+            <h1>DataShield <span class="accent">AI</span></h1>
+        </div>
+        <p class="tagline">Privacy-first local data analysis — your data never leaves your machine.</p>
+        <div class="status-pill" id="status-pill">
+            <span class="dot"></span>
+            <span class="label">No dataset</span>
+        </div>
+    </header>
+
+    <!-- ═══════════ Main split pane ═══════════ -->
+    <main id="split-pane">
+
+        <!-- ───── LEFT: Chat pane ───── -->
+        <section id="chat-pane" class="glass-panel">
+            <div class="pane-header">
+                <h2>💬 Chat</h2>
+                <button id="clear-chat-btn" class="icon-btn" title="Clear chat">🗑️</button>
+            </div>
+
+            <!-- Drop zone -->
+            <div id="drop-zone">
+                <div class="drop-content">
+                    <span class="drop-icon">📂</span>
+                    <p>Drag &amp; drop a <strong>.csv</strong> file here</p>
+                    <span class="drop-sub">or click to browse</span>
+                </div>
+                <input type="file" id="file-input" accept=".csv" hidden />
+            </div>
+
+            <!-- Schema diagram (Mermaid) -->
+            <div id="schema-section" class="hidden">
+                <div class="pane-subheader">
+                    <h3>🗂️ Schema Map</h3>
+                    <button id="toggle-schema-btn" class="icon-btn small" title="Toggle schema">▼</button>
+                </div>
+                <div id="schema-diagram"></div>
+            </div>
+
+            <!-- Chat messages -->
+            <div id="chat-messages"></div>
+
+            <!-- Input bar -->
+            <form id="chat-form">
+                <div class="input-wrap">
+                    <input type="text" id="chat-input" placeholder="Ask about your data…" autocomplete="off" disabled />
+                    <button type="submit" id="send-btn" disabled>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- ───── RIGHT: Gallery pane ───── -->
+        <section id="gallery-pane" class="glass-panel">
+            <div class="pane-header">
+                <h2>📊 Visualization Gallery</h2>
+                <span id="chart-count" class="badge">0</span>
+            </div>
+
+            <div id="gallery-grid">
+                <div id="gallery-empty">
+                    <span class="empty-icon">🎨</span>
+                    <p>Charts and visuals will appear here</p>
+                    <span class="empty-sub">Upload data and ask a question to get started</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ═══════════ Lightbox modal ═══════════ -->
+    <div id="lightbox" class="hidden">
+        <div class="lightbox-backdrop"></div>
+        <div class="lightbox-body">
+            <button id="lightbox-close" class="icon-btn">✕</button>
+            <img id="lightbox-img" src="" alt="Chart full view" />
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
