@@ -228,29 +228,39 @@ def _fallback_answer(question: str) -> str:
 
 
 def _fallback_chart(question: str) -> str:
-    df = current_df
-    numeric_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+    # Use a copy of the dataframe so we can clean data safely without breaking the app
+    df = current_df.copy()
     q = question.lower()
 
-    if not numeric_cols:
-        return "No numeric columns available for charting."
-
-    # --- THE MAGIC FIX: Smart Column Detection ---
-    # Find which numeric column the user actually asked for
-    target_num = numeric_cols[0]
-    for col in numeric_cols:
+    # 1. Find which column the user asked for out of ALL columns
+    target_num = None
+    for col in df.columns:
         if col.lower() in q:
             target_num = col
             break
+            
+    # 2. If no column mentioned, fallback to the first numeric one
+    if not target_num:
+        numeric_cols = df.select_dtypes(include="number").columns.tolist()
+        if not numeric_cols:
+            return "No numeric columns available for charting."
+        target_num = numeric_cols[0]
 
-    # Find which categorical column the user actually asked for
+    # 3. THE SNEAKY BUG FIX: Force the target column to be a number 
+    # (Strips commas, dollar signs, and turns text like 'C' into blank NaNs)
+    if not pd.api.types.is_numeric_dtype(df[target_num]):
+        df[target_num] = pd.to_numeric(
+            df[target_num].astype(str).str.replace(r'[,\$\s]', '', regex=True), 
+            errors='coerce'
+        )
+
+    # Find a categorical column if needed for bar charts
+    cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
     target_cat = cat_cols[0] if cat_cols else None
     for col in cat_cols:
-        if col.lower() in q:
+        if col.lower() in q and col != target_num:
             target_cat = col
             break
-    # ---------------------------------------------
 
     fig, ax = plt.subplots(figsize=(8, 5))
     sns.set_theme(style="darkgrid")
@@ -273,24 +283,29 @@ def _fallback_chart(question: str) -> str:
                 top.plot(kind="bar", ax=ax, color="#7c3aed", edgecolor="#1e1b4b")
                 ax.set_title(f"Top 10: Mean {target_num} by {target_cat}", fontsize=14, fontweight="bold")
             else:
-                df[target_num].head(20).plot(kind="bar", ax=ax, color="#7c3aed")
+                df[target_num].dropna().head(20).plot(kind="bar", ax=ax, color="#7c3aed")
                 ax.set_title(f"Bar chart of {target_num}", fontsize=14, fontweight="bold")
 
-        elif chart_type == "scatter" and len(numeric_cols) >= 2:
-            # Try to find a second numeric column for the scatter plot
-            second_num = numeric_cols[1]
-            for col in numeric_cols:
+        elif chart_type == "scatter":
+            second_num = None
+            for col in df.columns:
                 if col.lower() in q and col != target_num:
                     second_num = col
                     break
-                    
-            ax.scatter(df[target_num], df[second_num], c="#7c3aed", alpha=0.6, edgecolors="#1e1b4b")
-            ax.set_xlabel(target_num)
-            ax.set_ylabel(second_num)
-            ax.set_title(f"{target_num} vs {second_num}", fontsize=14, fontweight="bold")
+            
+            if second_num:
+                # Clean the second column too if necessary
+                if not pd.api.types.is_numeric_dtype(df[second_num]):
+                    df[second_num] = pd.to_numeric(df[second_num].astype(str).str.replace(r'[,\$\s]', '', regex=True), errors='coerce')
+                ax.scatter(df[target_num], df[second_num], c="#7c3aed", alpha=0.6, edgecolors="#1e1b4b")
+                ax.set_xlabel(target_num)
+                ax.set_ylabel(second_num)
+                ax.set_title(f"{target_num} vs {second_num}", fontsize=14, fontweight="bold")
+            else:
+                return "Need a second column name for a scatter plot."
 
         elif chart_type == "line":
-            df[target_num].head(50).plot(ax=ax, color="#7c3aed", linewidth=2)
+            df[target_num].dropna().head(50).plot(ax=ax, color="#7c3aed", linewidth=2)
             ax.set_title(f"Line plot of {target_num}", fontsize=14, fontweight="bold")
 
         fig.tight_layout()
