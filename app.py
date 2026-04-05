@@ -228,60 +228,70 @@ def _fallback_answer(question: str) -> str:
 
 
 def _fallback_chart(question: str) -> str:
-    """Generate a simple chart using Matplotlib when PandasAI is unavailable."""
     df = current_df
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
+    cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
     q = question.lower()
 
     if not numeric_cols:
         return "No numeric columns available for charting."
 
+    # --- THE MAGIC FIX: Smart Column Detection ---
+    # Find which numeric column the user actually asked for
+    target_num = numeric_cols[0]
+    for col in numeric_cols:
+        if col.lower() in q:
+            target_num = col
+            break
+
+    # Find which categorical column the user actually asked for
+    target_cat = cat_cols[0] if cat_cols else None
+    for col in cat_cols:
+        if col.lower() in q:
+            target_cat = col
+            break
+    # ---------------------------------------------
+
     fig, ax = plt.subplots(figsize=(8, 5))
     sns.set_theme(style="darkgrid")
 
     chart_type = "histogram"
-    if "bar" in q:
-        chart_type = "bar"
-    elif "scatter" in q:
-        chart_type = "scatter"
-    elif "line" in q:
-        chart_type = "line"
-    elif "hist" in q:
-        chart_type = "histogram"
+    if "bar" in q: chart_type = "bar"
+    elif "scatter" in q: chart_type = "scatter"
+    elif "line" in q: chart_type = "line"
 
     try:
         if chart_type == "histogram":
-            col = numeric_cols[0]
-            ax.hist(df[col].dropna(), bins=20, color="#7c3aed", edgecolor="#1e1b4b", alpha=0.85)
-            ax.set_title(f"Distribution of {col}", fontsize=14, fontweight="bold")
-            ax.set_xlabel(col)
+            ax.hist(df[target_num].dropna(), bins=20, color="#7c3aed", edgecolor="#1e1b4b", alpha=0.85)
+            ax.set_title(f"Distribution of {target_num}", fontsize=14, fontweight="bold")
+            ax.set_xlabel(target_num)
             ax.set_ylabel("Frequency")
 
         elif chart_type == "bar":
-            # Use first categorical + first numeric, or first two numeric
-            cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
-            if cat_cols and numeric_cols:
-                top = df.groupby(cat_cols[0])[numeric_cols[0]].mean().nlargest(10)
+            if target_cat:
+                top = df.groupby(target_cat)[target_num].mean().nlargest(10)
                 top.plot(kind="bar", ax=ax, color="#7c3aed", edgecolor="#1e1b4b")
-                ax.set_title(f"Top 10 — Mean {numeric_cols[0]} by {cat_cols[0]}", fontsize=14, fontweight="bold")
+                ax.set_title(f"Top 10: Mean {target_num} by {target_cat}", fontsize=14, fontweight="bold")
             else:
-                df[numeric_cols[0]].head(20).plot(kind="bar", ax=ax, color="#7c3aed")
-                ax.set_title(f"Bar chart of {numeric_cols[0]}", fontsize=14, fontweight="bold")
+                df[target_num].head(20).plot(kind="bar", ax=ax, color="#7c3aed")
+                ax.set_title(f"Bar chart of {target_num}", fontsize=14, fontweight="bold")
 
         elif chart_type == "scatter" and len(numeric_cols) >= 2:
-            ax.scatter(df[numeric_cols[0]], df[numeric_cols[1]], c="#7c3aed", alpha=0.6, edgecolors="#1e1b4b")
-            ax.set_xlabel(numeric_cols[0])
-            ax.set_ylabel(numeric_cols[1])
-            ax.set_title(f"{numeric_cols[0]} vs {numeric_cols[1]}", fontsize=14, fontweight="bold")
+            # Try to find a second numeric column for the scatter plot
+            second_num = numeric_cols[1]
+            for col in numeric_cols:
+                if col.lower() in q and col != target_num:
+                    second_num = col
+                    break
+                    
+            ax.scatter(df[target_num], df[second_num], c="#7c3aed", alpha=0.6, edgecolors="#1e1b4b")
+            ax.set_xlabel(target_num)
+            ax.set_ylabel(second_num)
+            ax.set_title(f"{target_num} vs {second_num}", fontsize=14, fontweight="bold")
 
         elif chart_type == "line":
-            df[numeric_cols[0]].head(50).plot(ax=ax, color="#7c3aed", linewidth=2)
-            ax.set_title(f"Line plot of {numeric_cols[0]}", fontsize=14, fontweight="bold")
-
-        else:
-            col = numeric_cols[0]
-            ax.hist(df[col].dropna(), bins=20, color="#7c3aed", edgecolor="#1e1b4b", alpha=0.85)
-            ax.set_title(f"Distribution of {col}", fontsize=14, fontweight="bold")
+            df[target_num].head(50).plot(ax=ax, color="#7c3aed", linewidth=2)
+            ax.set_title(f"Line plot of {target_num}", fontsize=14, fontweight="bold")
 
         fig.tight_layout()
         chart_name = f"chart_{int(time.time())}_{chart_type}.png"
@@ -295,23 +305,6 @@ def _fallback_chart(question: str) -> str:
     except Exception as exc:
         plt.close(fig)
         return f"Could not generate chart: {exc}"
-
-
-@app.route("/charts", methods=["GET"])
-def charts():
-    """Return a list of all chart image URLs in the gallery."""
-    try:
-        files = sorted(
-            CHART_DIR.glob("*.png"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        urls = [f"/static/charts/{p.name}" for p in files]
-        return jsonify({"charts": urls})
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
-
-
 # ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
